@@ -33,23 +33,19 @@ class Servidor:
         if (flags & FLAGS_SYN) == FLAGS_SYN:
             # A flag SYN estar setada significa que é um cliente tentando estabelecer uma conexão nova
             # TODO: talvez você precise passar mais coisas para o construtor de conexão
-            #print(self.rede.fila)
-            #self.rede.fila.append((segment, src_addr))
-            #print(len(self.rede.fila))
 
-            seq_no2 = random.randint(1, 10000000)
+            #mandar o pacote com syn e ack setados
+
+            init_seq_no = random.randint(1, 10000000)
             ack_no = seq_no + 1
             flags = FLAGS_ACK|FLAGS_SYN
 
-            #segment = make_header(src_port, dst_port, seq_no, ack_no, flags)
-            segment = fix_checksum(make_header(self.porta, src_port, seq_no2, ack_no, flags), src_addr, dst_addr)
+            segment = fix_checksum(make_header(self.porta, src_port, init_seq_no, ack_no, flags), src_addr, dst_addr)
             self.rede.enviar(segment, src_addr)
 
-            conexao = self.conexoes[id_conexao] = Conexao(self, id_conexao, seq_no2, seq_no + 1)
+            conexao = self.conexoes[id_conexao] = Conexao(self, id_conexao, init_seq_no, ack_no)
             # TODO: você precisa fazer o handshake aceitando a conexão. Escolha se você acha melhor
             # fazer aqui mesmo ou dentro da classe Conexao.
-
-            #mandar o pacote com syn e ack setados
 
             if self.callback:
                 self.callback(conexao)
@@ -61,7 +57,6 @@ class Servidor:
             print('%s:%d -> %s:%d (pacote associado a conexão desconhecida)' %
                   (src_addr, src_port, dst_addr, dst_port))
 
-
 class Conexao:
     def __init__(self, servidor, id_conexao, seq_no, seq_no0):
         self.servidor = servidor
@@ -71,16 +66,45 @@ class Conexao:
         self.callback = None
         self.timer = asyncio.get_event_loop().call_later(1, self._exemplo_timer)  # um timer pode ser criado assim; esta linha é só um exemplo e pode ser removida
         #self.timer.cancel()   # é possível cancelar o timer chamando esse método; esta linha é só um exemplo e pode ser removida
+        self.inicio = seq_no
+        self.buffer = b''
+        self.buffer0 = b''
+        self.is_timer = True
 
     def _exemplo_timer(self):
         # Esta função é só um exemplo e pode ser removida
         print('Este é um exemplo de como fazer um timer')
+
+
+
+
+
 
     def _rdt_rcv(self, seq_no, ack_no, flags, payload):
         # TODO: trate aqui o recebimento de segmentos provenientes da camada de rede.
         # Chame self.callback(self, dados) para passar dados para a camada de aplicação após
         # garantir que eles não sejam duplicados e que tenham sido recebidos em ordem.
         print('recebido payload: %r' % payload)
+
+        if self.inicio != ack_no:
+            inicio = self.inicio
+            self.enviar(self.buffer[(ack_no - inicio):])
+
+        if seq_no == self.seq_no0 and payload:
+            self.seq_no0 = seq_no + len(payload)
+            self.buffer0 += payload
+            self.callback(self, payload)
+
+        if self.is_timer:
+            self.timer.cancel()
+            self.timer = asyncio.get_event_loop().call_later(1, self._timeout())
+            self.is_timer = True
+            self.servidor.rede.enviar(fix_checksum(make_header(self.id_conexao[3], self.id_conexao[1], self.seq_no, self.seq_no0, FLAGS_ACK), self.id_conexao[0], self.id_conexao[2]), self.id_conexao[0])
+
+        elif (flags & FLAGS_FIN) == FLAGS_FIN:
+            self.callback(self, b'')
+            self.seq_no0 += 1
+            self.servidor.rede.enviar(fix_checksum(make_header(self.id_conexao[3], self.id_conexao[1], self.seq_no, self.seq_no0, FLAGS_ACK), self.id_conexao[0], self.id_conexao[2]), self.id_conexao[0])
 
     # Os métodos abaixo fazem parte da API
 
@@ -106,3 +130,7 @@ class Conexao:
         """
         # TODO: implemente aqui o fechamento de conexão
         pass
+
+    #nossas
+    def _timeout(self):
+        self.is_timer = False
