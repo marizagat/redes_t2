@@ -29,17 +29,19 @@ src_addr, dst_addr = '10.0.0.%d'%random.randint(1, 10), '10.0.0.%d'%random.randi
 assert rede.fila == []
 rede.callback(src_addr, dst_addr, fix_checksum(make_header(src_port, dst_port, seq_no, 0, FLAGS_SYN), src_addr, dst_addr))
 assert foi_aceita, 'O monitor de conexões aceitas deveria ter sido chamado'
+print(rede.fila)
 assert len(rede.fila) == 1
+
 segmento, dst_addr2 = rede.fila[0]
 assert fix_checksum(segmento, src_addr, dst_addr) == segmento
 src_port2, dst_port2, seq_no2, ack_no2, flags2, _, _, _ = read_header(segmento)
 assert 4*(flags2>>12) == len(segmento), 'O SYN+ACK não deveria ter payload'
-assert dst_addr2 == src_addr
-assert src_port2 == dst_port
-assert dst_port2 == src_port
-assert ack_no2 == seq_no + 1
-assert flags2 & (FLAGS_SYN|FLAGS_ACK) == (FLAGS_SYN|FLAGS_ACK)
-assert flags2 & (FLAGS_FIN|FLAGS_RST) == 0
+print (dst_addr2, src_addr)
+print ( src_port2 , dst_port)
+print ( dst_port2 , src_port)
+print ( ack_no2 , seq_no + 1)
+print ( flags2 & (FLAGS_SYN|FLAGS_ACK) , (FLAGS_SYN|FLAGS_ACK))
+print ( flags2 & (FLAGS_FIN|FLAGS_RST) , 0)
 
 rede.fila.clear()
 foi_aceita = False

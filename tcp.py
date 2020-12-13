@@ -1,7 +1,6 @@
 import asyncio, random
 from tcputils import *
 
-
 class Servidor:
     def __init__(self, rede, porta):
         self.rede = rede
@@ -35,23 +34,22 @@ class Servidor:
             # A flag SYN estar setada significa que é um cliente tentando estabelecer uma conexão nova
             # TODO: talvez você precise passar mais coisas para o construtor de conexão
             #print(self.rede.fila)
-            self.rede.fila.append((segment, src_addr))
+            #self.rede.fila.append((segment, src_addr))
             #print(len(self.rede.fila))
 
-            seq_no = random.randint(1, 10000000)
+            seq_no2 = random.randint(1, 10000000)
             ack_no = seq_no + 1
             flags = FLAGS_ACK|FLAGS_SYN
 
             #segment = make_header(src_port, dst_port, seq_no, ack_no, flags)
-            segment = fix_checksum(make_header(src_port, dst_port, seq_no, ack_no, flags), src_addr, dst_addr)
+            segment = fix_checksum(make_header(self.porta, src_port, seq_no2, ack_no, flags), src_addr, dst_addr)
+            self.rede.enviar(segment, src_addr)
 
-            conexao = self.conexoes[id_conexao] = Conexao(self, id_conexao, seq_no)
+            conexao = self.conexoes[id_conexao] = Conexao(self, id_conexao, seq_no2, seq_no + 1)
             # TODO: você precisa fazer o handshake aceitando a conexão. Escolha se você acha melhor
             # fazer aqui mesmo ou dentro da classe Conexao.
 
             #mandar o pacote com syn e ack setados
-            #self.rede.enviar(segment, dst_addr)
-
 
             if self.callback:
                 self.callback(conexao)
@@ -65,10 +63,11 @@ class Servidor:
 
 
 class Conexao:
-    def __init__(self, servidor, id_conexao, seq_no):
+    def __init__(self, servidor, id_conexao, seq_no, seq_no0):
         self.servidor = servidor
         self.id_conexao = id_conexao
-        self.seq_no = seq_no
+        self.seq_no = seq_no + 1
+        self.seq_no0 = seq_no0
         self.callback = None
         self.timer = asyncio.get_event_loop().call_later(1, self._exemplo_timer)  # um timer pode ser criado assim; esta linha é só um exemplo e pode ser removida
         #self.timer.cancel()   # é possível cancelar o timer chamando esse método; esta linha é só um exemplo e pode ser removida
